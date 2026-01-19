@@ -27,6 +27,16 @@ app.get('/', (req, res) => {
   res.send('Welcome to the Competition Registration API');
 });
 
+app.use((req, res) => {
+  res.status(404).json({
+    status: 'error',
+    message: 'ไม่พบเส้นทาง API ที่ร้องขอ'
+  });
+});
+
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log('='.repeat(50));
+  console.log(`🚀 Server กำลังทำงานที่ http://localhost:${PORT}`);
+  console.log(`📊 Members API: http://localhost:${PORT}/members`);
+  console.log('='.repeat(50));
 });
