@@ -1,5 +1,5 @@
 const express = require('express');
-const app = express(); // เปลี่ยนจาก Router เป็น app
+const app = express(); 
 const controller = require('../controllers/competitionController');
 
 app.get('/', controller.getCompetitions);
