@@ -8,6 +8,5 @@ exports.register = (req, res) => {
 exports.login = (req, res) => {
     res.status(200).json({ 
         message: "เข้าสู่ระบบสำเร็จ",
-        token: "fake-jwt-token-for-testing" 
     });
 };

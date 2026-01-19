@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const swaggerUi = require('swagger-ui-express');
+const swaggerFile = require('../swagger-output.json');
 const app = express();
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -13,6 +15,8 @@ const authRoutes = require('./routes/auth.route');
 app.use(bodyParser.json());
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerFile));
 
 app.use('/competitions', competitionRoutes);
 app.use('/registrations', registrationRoutes);
