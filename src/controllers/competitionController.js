@@ -128,7 +128,6 @@ exports.updateCompetition = async (req, res) => {
         prize, 
         description, 
         image,
-        location,    
         date: date ? new Date(date) : undefined, 
         maxPlayer: maxPlayer ? parseInt(maxPlayer, 10) : undefined 
       }
@@ -153,8 +152,13 @@ exports.deleteCompetition = async (req, res) => {
 
 // POST / - สร้างรายการการแข่งขันใหม่
 exports.createCompetition = async (req, res) => {
-  const { name, date, maxPlayer, rules, prize, description, image, location } = req.body;
-  if (!name || !date || maxPlayer === undefined) return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ครบ' });
+  // 1. เพิ่ม detail เข้าไปในการดึงค่าจาก req.body
+  const { name, date, maxPlayer, rules, prize, description, image, detail } = req.body;
+  
+  if (!name || !date || maxPlayer === undefined) {
+    return res.status(400).json({ status: 'error', message: 'ข้อมูลไม่ครบ' });
+  }
+
   try {
     const newComp = await prisma.competition.create({
       data: { 
@@ -164,8 +168,8 @@ exports.createCompetition = async (req, res) => {
         rules: rules || null, 
         prize: prize || null, 
         description: description || null,
+        detail: detail || null, 
         image: image || null,
-        location: location || null,
       }
     });
     res.status(201).json({ status: 'success', data: newComp });

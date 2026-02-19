@@ -1,7 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// POST / - ลงทะเบียนแข่งขัน (Re-activate ได้ถ้าเคยยกเลิก)
 exports.registerCompetition = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
@@ -16,68 +15,68 @@ exports.registerCompetition = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'ID รายการแข่งขันไม่ถูกต้อง' });
     }
 
-    const competition = await prisma.competition.findUnique({
-      where: { id: cId },
-      include: {
-        registrations: {
-          where: { status: { not: 'cancelled' } }
+    const result = await prisma.$transaction(async (tx) => {
+      const competition = await tx.competition.findUnique({
+        where: { id: cId },
+        include: {
+          _count: {
+            select: { registrations: { where: { status: { not: 'cancelled' } } } }
+          }
         }
+      });
+
+      if (!competition) throw new Error('NOT_FOUND');
+
+      const now = new Date();
+      if (competition.endDate && now > new Date(competition.endDate)) {
+        throw new Error('CLOSED');
       }
-    });
 
-    if (!competition) {
-      return res.status(404).json({ status: 'error', message: 'ไม่พบรายการแข่งขันนี้' });
-    }
+      if (competition.maxPlayer > 0 && competition._count.registrations >= competition.maxPlayer) {
+        throw new Error('FULL');
+      }
 
-    const now = new Date();
-    if (competition.endDate && now > new Date(competition.endDate)) {
-      return res.status(400).json({ status: 'error', message: 'ขออภัย รายการนี้ปิดรับสมัครแล้ว' });
-    }
+      const existing = await tx.registration.findFirst({
+        where: { userId: uId, competitionId: cId }
+      });
 
-    if (competition.maxPlayer > 0 && competition.registrations.length >= competition.maxPlayer) {
-      return res.status(400).json({ status: 'error', message: 'ขออภัย จำนวนผู้สมัครเต็มแล้ว' });
-    }
-
-    const existing = await prisma.registration.findFirst({
-      where: { userId: uId, competitionId: cId }
-    });
-
-    if (existing) {
-      if (existing.status !== 'cancelled') {
-        return res.status(409).json({ 
-          status: 'error', 
-          message: 'คุณได้สมัครรายการนี้ไปแล้ว',
-          data: existing 
+      if (existing) {
+        if (existing.status !== 'cancelled') {
+          throw new Error('ALREADY_EXISTS');
+        }
+        
+        return await tx.registration.update({
+          where: { id: existing.id },
+          data: {
+            status: 'pending',
+            createdAt: new Date()
+          }
         });
       }
 
-      const updated = await prisma.registration.update({
-        where: { id: existing.id },
+      return await tx.registration.create({
         data: {
-          status: 'pending',
-          createdAt: new Date()
+          userId: uId,
+          competitionId: cId,
+          status: 'pending'
         }
       });
-      return res.status(200).json({ status: 'success', message: 'กลับเข้าสู่การสมัครสำเร็จ', data: updated });
-    }
-
-    const result = await prisma.registration.create({
-      data: {
-        userId: uId,
-        competitionId: cId,
-        status: 'pending'
-      }
     });
 
     return res.status(201).json({ status: 'success', message: 'ลงทะเบียนสำเร็จ', data: result });
 
   } catch (error) {
     console.error("🔥 [Registration Error]:", error);
+    
+    if (error.message === 'NOT_FOUND') return res.status(404).json({ status: 'error', message: 'ไม่พบรายการแข่งขันนี้' });
+    if (error.message === 'CLOSED') return res.status(400).json({ status: 'error', message: 'ขออภัย รายการนี้ปิดรับสมัครแล้ว' });
+    if (error.message === 'FULL') return res.status(400).json({ status: 'error', message: 'ขออภัย จำนวนผู้สมัครเต็มแล้ว' });
+    if (error.message === 'ALREADY_EXISTS') return res.status(409).json({ status: 'error', message: 'คุณได้สมัครรายการนี้ไปแล้ว' });
+
     res.status(500).json({ status: 'error', message: 'เกิดข้อผิดพลาดภายในระบบ' });
   }
 };
 
-// GET /my-history - ดูประวัติตัวเอง (รายการที่ยกเลิกจะถูกกรองออก)
 exports.getPlayerHistory = async (req, res) => {
   try {
     const userId = Number(req.user.id);
@@ -99,7 +98,6 @@ exports.getPlayerHistory = async (req, res) => {
   }
 };
 
-// GET /:competitionId/participants - ดูรายชื่อผู้สมัครในรายการ (เฉพาะสถานะที่ถูกต้อง)
 exports.getCompetitionParticipants = async (req, res) => {
   const competitionId = Number(req.params.competitionId);
   if (isNaN(competitionId)) return res.status(400).json({ status: 'error', message: 'ID การแข่งขันไม่ถูกต้อง' });
@@ -108,7 +106,7 @@ exports.getCompetitionParticipants = async (req, res) => {
     const participants = await prisma.registration.findMany({
       where: {
         competitionId,
-        status: { in: ['approved', 'paid', 'pending'] } 
+        status: { in: ['approved', 'paid', 'pending', 'waiting', 'rejected'] } 
       },
       include: {
         user: {
@@ -124,7 +122,35 @@ exports.getCompetitionParticipants = async (req, res) => {
   }
 };
 
-// PATCH /:id/cancel - ยกเลิกการสมัคร
+exports.cancelRegistration = async (req, res) => {
+  const id = Number(req.params.id);
+  const userId = Number(req.user.id);
+
+  try {
+    const entry = await prisma.registration.findUnique({ where: { id } });
+    if (!entry) return res.status(404).json({ status: 'error', message: 'ไม่พบข้อมูล' });
+
+    // ตรวจสอบสิทธิ์: ต้องเป็นเจ้าของ หรือ Admin
+    if (entry.userId !== userId && req.user.role !== 'Admin') {
+      return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์ทำรายการนี้' });
+    }
+
+    // ห้ามยกเลิกถ้าจ่ายเงินหรืออนุมัติแล้ว
+    if (entry.status === 'approved' || entry.status === 'paid') {
+      return res.status(400).json({ status: 'error', message: 'ไม่สามารถยกเลิกรายการที่อนุมัติแล้วได้' });
+    }
+
+    const updated = await prisma.registration.update({
+      where: { id },
+      data: { status: 'cancelled' } // เปลี่ยนเป็น cancelled เพื่อให้หลุดจาก list
+    });
+
+    res.json({ status: 'success', message: 'ยกเลิกการสมัครแล้ว', data: updated });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: 'ยกเลิกไม่สำเร็จ' });
+  }
+};
+
 exports.cancelRegistration = async (req, res) => {
   const id = Number(req.params.id);
   const userId = Number(req.user.id);
@@ -135,6 +161,10 @@ exports.cancelRegistration = async (req, res) => {
 
     if (entry.userId !== userId && req.user.role !== 'Admin') {
       return res.status(403).json({ status: 'error', message: 'ไม่มีสิทธิ์ทำรายการนี้' });
+    }
+
+    if (entry.status === 'approved' || entry.status === 'paid') {
+      return res.status(400).json({ status: 'error', message: 'ไม่สามารถยกเลิกรายการที่อนุมัติแล้วได้ กรุณาติดต่อทีมงาน' });
     }
 
     const updated = await prisma.registration.update({
@@ -148,7 +178,6 @@ exports.cancelRegistration = async (req, res) => {
   }
 };
 
-// Helper function สำหรับตรวจสอบสิทธิ์ Admin
 const checkAdmin = (req, res) => {
   if (req.user.role !== 'Admin') {
     res.status(403).json({ status: 'error', message: 'เฉพาะ Admin เท่านั้น' });
@@ -157,7 +186,6 @@ const checkAdmin = (req, res) => {
   return true;
 };
 
-// Admin Actions: อนุมัติการสมัคร
 exports.approveRegistration = async (req, res) => {
   if (!checkAdmin(req, res)) return;
   try {
@@ -171,7 +199,6 @@ exports.approveRegistration = async (req, res) => {
   }
 };
 
-// Admin Actions: ปฏิเสธการสมัคร
 exports.rejectRegistration = async (req, res) => {
   if (!checkAdmin(req, res)) return;
   try {
@@ -179,18 +206,20 @@ exports.rejectRegistration = async (req, res) => {
       where: { id: Number(req.params.id) },
       data: { status: 'rejected' }
     });
-    res.json({ status: 'success', message: 'ปฏิเสธเรียบร้อย', data: result });
+    res.json({ status: 'success', message: 'ปฏิเสธการสมัครเรียบร้อย', data: result });
   } catch (error) {
     res.status(500).json({ status: 'error', message: 'ดำเนินการไม่สำเร็จ' });
   }
 };
 
-// Admin Actions: อัปเดตสถานะแบบกำหนดเอง
 exports.updateStatus = async (req, res) => {
   if (!checkAdmin(req, res)) return;
   const { status } = req.body;
-  const validStatus = ['approved', 'rejected', 'pending', 'cancelled'];
-  if (!validStatus.includes(status)) return res.status(400).json({ status: 'error', message: 'สถานะไม่ถูกต้อง' });
+  const validStatus = ['approved', 'rejected', 'pending', 'cancelled', 'waiting', 'paid'];
+  
+  if (!validStatus.includes(status)) {
+    return res.status(400).json({ status: 'error', message: 'สถานะไม่ถูกต้อง' });
+  }
 
   try {
     const updated = await prisma.registration.update({
@@ -203,14 +232,13 @@ exports.updateStatus = async (req, res) => {
   }
 };
 
-// Admin Actions: ดูรายการลงทะเบียนทั้งหมดในระบบ
 exports.getAllRegistrations = async (req, res) => {
   if (!checkAdmin(req, res)) return;
   try {
     const data = await prisma.registration.findMany({
       include: {
-        user: { select: { id: true, name: true, username: true } },
-        competition: { select: { id: true, name: true } }
+        user: { select: { id: true, name: true, username: true, email: true } },
+        competition: { select: { id: true, name: true, price: true } }
       },
       orderBy: { createdAt: 'desc' }
     });

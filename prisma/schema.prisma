@@ -65,7 +65,10 @@ model Registration {
 model Payment {
   id             Int          @id @default(autoincrement())
   amount         Float
-  method         String
+  method         String       @default("Transfer") 
+  slipImage      String?      @db.Text             
+  status         String       @default("PENDING")  
+  
   registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   registrationId Int          @unique
   createdAt      DateTime     @default(now())
