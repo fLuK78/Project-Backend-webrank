@@ -28,7 +28,7 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-exports.upload = multer({ 
+exports.upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 }
@@ -130,17 +130,18 @@ exports.deleteUser = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = parseInt(req.user?.id || req.user?.userId || req.user?.sub, 10);
-    
+
     if (isNaN(userId)) {
       return res.status(400).json({ status: 'error', message: 'ID ผู้ใช้ไม่ถูกต้อง' });
     }
 
     const body = req.body || {};
     const { name, phone, bio, location, socialLink, password } = body;
-    
+
     let imageUrl = body.image;
     if (req.file) {
-      imageUrl = `${import.meta.env.VITE_API_URL}/uploads/${req.file.filename}`;
+      const baseUrl = process.env.API_URL || '';
+      imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
     }
 
     const dataToUpdate = {
@@ -155,10 +156,10 @@ exports.updateProfile = async (req, res) => {
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: dataToUpdate,
-      select: { 
-        id: true, username: true, name: true, email: true, 
-        image: true, role: true, phone: true, bio: true, 
-        location: true, socialLink: true 
+      select: {
+        id: true, username: true, name: true, email: true,
+        image: true, role: true, phone: true, bio: true,
+        location: true, socialLink: true
       }
     });
 
@@ -166,7 +167,7 @@ exports.updateProfile = async (req, res) => {
 
   } catch (err) {
     if (err.code === 'P2025') {
-       return res.status(404).json({ status: 'error', message: 'ไม่พบชื่อผู้ใช้นี้ในระบบ (ID ไม่ตรง)' });
+      return res.status(404).json({ status: 'error', message: 'ไม่พบชื่อผู้ใช้นี้ในระบบ (ID ไม่ตรง)' });
     }
     res.status(500).json({ status: 'error', message: err.message });
   }
