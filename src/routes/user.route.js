@@ -1,30 +1,33 @@
 const express = require('express');
-const app = express();
+const router = express.Router();
 const controller = require('../controllers/userController');
+const jwt = require('jsonwebtoken');
 
+// Middleware ตรวจสอบ Token
+const authenticate = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: "ต้องล็อกอินก่อน" });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: "Token ไม่ถูกต้อง" });
+  }
+};
 
-app.post('/', 
-  // #swagger.tags = ['Users']
-  // #swagger.description = 'สร้างผู้ใช้งานใหม่ (Register)'
-  controller.createUser 
-);
+// ROUTES สำหรับข้อมูลส่วนตัว (Static)
+router.get('/profile', authenticate, controller.getProfile);
+router.put('/profile', authenticate, controller.upload.single('image'), controller.updateProfile);
 
-app.get('/:id',
-  // #swagger.tags = ['Users']
-  // #swagger.description = 'ดูข้อมูลผู้ใช้ตาม ID'
-  controller.getUserById
-);
+// ROUTES สำหรับแอดมิน
+router.get('/', authenticate, controller.getAllUsers);
+router.post('/', authenticate, controller.createUser);
 
-app.put('/:id',
-  // #swagger.tags = ['Users']
-  // #swagger.description = 'แก้ไขข้อมูลผู้ใช้'
-  controller.updateUser
-);
+// ROUTES ที่มี Parameters 
+router.get('/:id', authenticate, controller.getUserById);
+router.put('/:id', authenticate, controller.updateUser);
+router.delete('/:id', authenticate, controller.deleteUser);
 
-app.delete('/:id',
-  // #swagger.tags = ['Users']
-  // #swagger.description = 'ลบผู้ใช้'
-  controller.deleteUser
-);
-
-module.exports = app;
+module.exports = router;

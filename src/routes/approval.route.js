@@ -1,17 +1,20 @@
 const express = require('express');
-const app = express();
-const controller = require('../controllers/approvalController');
+const router = express.Router();
+const controller = require('../controllers/registrationController');
+const { protect, isAdmin } = require('../middleware/authMiddleware'); 
 
-app.put('/:id/approve',
-  // #swagger.tags = ['Approvals']
-  // #swagger.description = 'อนุมัติการลงทะเบียน (Staff/Admin)'
+// 1. อนุมัติการลงทะเบียน
+router.put('/:id/approve',
+  protect, 
+  isAdmin,
   controller.approveRegistration
 );
 
-app.put('/:id/reject',
-  // #swagger.tags = ['Approvals']
-  // #swagger.description = 'ไม่อนุมัติการลงทะเบียน (Staff/Admin)'
+// 2. ไม่อนุมัติการลงทะเบียน
+router.put('/:id/reject',
+  protect, 
+  isAdmin,
   controller.rejectRegistration
 );
 
-module.exports = app;
+module.exports = router;

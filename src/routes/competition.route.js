@@ -1,41 +1,66 @@
 const express = require('express');
-const app = express(); 
+const router = express.Router(); 
 const controller = require('../controllers/competitionController');
+const auth = require('../middleware/auth');
 
-app.get('/', 
+
+router.get('/',
   // #swagger.tags = ['Competitions']
   // #swagger.description = 'ดึงข้อมูลการแข่งขันทั้งหมด'
   controller.getCompetitions
 );
 
-app.get('/:id', 
+router.get('/:id',
   // #swagger.tags = ['Competitions']
   // #swagger.description = 'ดึงข้อมูลการแข่งขันตาม ID'
   controller.getCompetitionById
 );
 
-app.get('/:id/slots', 
+router.get('/:id/slots',
   // #swagger.tags = ['Competitions']
   // #swagger.description = 'ตรวจสอบจำนวนที่ว่าง'
   controller.getSlots
 );
 
-app.post('/', 
+router.get('/:id/players',
   // #swagger.tags = ['Competitions']
-  // #swagger.description = 'สร้างการแข่งขันใหม่'
+  // #swagger.description = 'ดึงรายชื่อผู้สมัครในรายการนี้'
+  controller.getCompetitionPlayers
+);
+
+router.post('/',
+  auth, 
+  // #swagger.tags = ['Competitions']
+  // #swagger.description = 'สร้างรายการแข่งขันใหม่ (ต้องล็อกอินก่อน)'
   controller.createCompetition
 );
 
-app.put('/:id', 
+router.post('/:id/join',
+  auth,
   // #swagger.tags = ['Competitions']
-  // #swagger.description = 'แก้ไขข้อมูลการแข่งขัน'
+  // #swagger.description = 'ลงสมัครเข้าร่วมการแข่งขัน'
+  controller.joinCompetition
+);
+
+router.delete('/:id/join',
+  auth,
+  // #swagger.tags = ['Competitions']
+  // #swagger.description = 'ยกเลิกการสมัครเข้าร่วมการแข่งขัน'
+  controller.cancelJoinCompetition
+);
+
+router.put('/:id',
+  auth,
+  // #swagger.tags = ['Competitions']
+  // #swagger.description = 'แก้ไขข้อมูลการแข่งขัน (ต้องล็อกอินก่อน)'
   controller.updateCompetition
 );
 
-app.delete('/:id', 
+router.delete('/:id',
+  auth,
   // #swagger.tags = ['Competitions']
-  // #swagger.description = 'ลบการแข่งขัน'
+  // #swagger.description = 'ลบรายการแข่งขัน (ต้องล็อกอินก่อน)'
   controller.deleteCompetition
 );
 
-module.exports = app;
+module.exports = router;

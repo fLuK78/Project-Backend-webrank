@@ -14,9 +14,15 @@ model User {
   email         String         @unique
   password      String
   phone         String?
+  image         String?
   role          String         @default("Player")
-  registrations Registration[]
-  approvals     Approval[]     @relation("AdminApprover")
+  
+  bio           String?        @db.Text
+  location      String?
+  socialLink    String?
+
+  registrations Registration[] @relation("PlayerRegistrations")
+  approvedTasks Registration[] @relation("AdminApprover")
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -25,39 +31,42 @@ model Competition {
   id            Int            @id @default(autoincrement())
   name          String
   date          DateTime
-  maxPlayer     Int
+  description String?  @db.Text
+  maxPlayer     Int 
+  prize       String?      
+  rules       String?  @db.Text         
   detail        String?        @db.Text
   registrations Registration[]
+  image String? @db.Text
   createdAt     DateTime       @default(now())
 }
 
 model Registration {
-  id            Int         @id @default(autoincrement())
-  status        String      @default("pending")
-  user          User        @relation(fields: [userId], references: [id])
-  userId        Int
-  competition   Competition @relation(fields: [competitionId], references: [id])
+  id     Int    @id @default(autoincrement())
+  status String @default("pending")
+
+  user   User @relation("PlayerRegistrations", fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   competitionId Int
-  payment       Payment?
-  approval      Approval?
-  createdAt     DateTime    @default(now())
+
+  payment Payment?
+
+  adminId  Int?
+  approver User? @relation("AdminApprover", fields: [adminId], references: [id], onDelete: SetNull)
+
+  adminNote String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@unique([userId, competitionId])
 }
 
 model Payment {
   id             Int          @id @default(autoincrement())
   amount         Float
   method         String
-  registration   Registration @relation(fields: [registrationId], references: [id]) 
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   registrationId Int          @unique
-  createdAt      DateTime     @default(now())
-}
-
-model Approval {
-  id             Int          @id @default(autoincrement())
-  registration   Registration @relation(fields: [registrationId], references: [id])
-  registrationId Int          @unique
-  admin          User         @relation("AdminApprover", fields: [adminId], references: [id])
-  adminId        Int
-  note           String?
   createdAt      DateTime     @default(now())
 }
