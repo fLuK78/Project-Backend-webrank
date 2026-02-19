@@ -130,24 +130,18 @@ exports.deleteUser = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = parseInt(req.user?.id || req.user?.userId || req.user?.sub, 10);
-
-    if (isNaN(userId)) {
-      return res.status(400).json({ status: 'error', message: 'ID ผู้ใช้ไม่ถูกต้อง' });
-    }
+    if (isNaN(userId)) return res.status(400).json({ status: 'error', message: 'ID ผู้ใช้ไม่ถูกต้อง' });
 
     const body = req.body || {};
     const { name, phone, bio, location, socialLink, password } = body;
 
     let imageUrl = body.image;
     if (req.file) {
-      const baseUrl = process.env.API_URL || '';
+      const baseUrl = process.env.API_URL || 'https://arena-tournament.onrender.com';
       imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
     }
 
-    const dataToUpdate = {
-      name, phone, bio, location, socialLink,
-      image: imageUrl
-    };
+    const dataToUpdate = { name, phone, bio, location, socialLink, image: imageUrl };
 
     if (password && password.trim() !== "") {
       dataToUpdate.password = await bcrypt.hash(password, 10);
@@ -164,11 +158,7 @@ exports.updateProfile = async (req, res) => {
     });
 
     res.json({ status: 'success', message: 'อัปเดตสำเร็จ', data: updatedUser });
-
   } catch (err) {
-    if (err.code === 'P2025') {
-      return res.status(404).json({ status: 'error', message: 'ไม่พบชื่อผู้ใช้นี้ในระบบ (ID ไม่ตรง)' });
-    }
     res.status(500).json({ status: 'error', message: err.message });
   }
 };
