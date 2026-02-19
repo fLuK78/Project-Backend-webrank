@@ -23,7 +23,6 @@ app.use('/api/registrations', require('./routes/registration.route'));
 app.use('/api/payments', require('./routes/payment.route'));
 app.use('/api/approvals', require('./routes/approval.route'));
 app.use('/api/users', require('./routes/user.route'));
-app.use('/api/users', userRoutes);
 app.use('/uploads', express.static('uploads'));
 
 // แยก Path ให้ชัดเจน ไม่ให้ซ้ำกัน
