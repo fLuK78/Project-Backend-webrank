@@ -137,7 +137,7 @@ exports.updateProfile = async (req, res) => {
 
     let imageUrl = body.image;
     if (req.file) {
-      const baseUrl = process.env.API_URL || 'https://arena-tournament.onrender.com';
+      const baseUrl = process.env.API_URL || 'https://webrank-back.onrender.com';
       imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
     }
 

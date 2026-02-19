@@ -6,7 +6,7 @@ const app = express();
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const PORT = process.env.PORT || 4000;
-const userRoutes = require('./routes/user.route');
+
 
 // 1. Middlewares
 app.use(cors());
