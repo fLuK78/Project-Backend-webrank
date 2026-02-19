@@ -140,7 +140,7 @@ exports.updateProfile = async (req, res) => {
     
     let imageUrl = body.image;
     if (req.file) {
-      imageUrl = `http://localhost:4000/uploads/${req.file.filename}`;
+      imageUrl = `${import.meta.env.VITE_API_URL}/uploads/${req.file.filename}`;
     }
 
     const dataToUpdate = {
